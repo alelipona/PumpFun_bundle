@@ -8,16 +8,16 @@ const { PumpFunSDK } = require("../sdk/pumpFunSDK");
 const { AnchorProvider } = require("@coral-xyz/anchor");
 const bs58 = require("bs58");
 
-const walletSecret = "dev私钥搞里头"; // 设置钱包的私钥（dev私钥）
+const walletSecret = "dev wallet private key"; // Set wallet private key (dev private key)
 const wallet = Keypair.fromSecretKey(new Uint8Array(bs58.decode(walletSecret)));
 
-const connection = new Connection("rpc搞里头", "confirmed");
+const connection = new Connection("rpc endpoint", "confirmed");
 
 const provider = new AnchorProvider(connection, wallet, { commitment: "confirmed" });
 
 const sdk = new PumpFunSDK(provider);
 
-// 读取walletKeys.txt中的私钥
+// Read private keys from walletKeys.txt
 async function getPublicKeysFromFile(filePath) {
     try {
         const fileContent = await fs.readFile(filePath, 'utf8');
@@ -30,13 +30,13 @@ async function getPublicKeysFromFile(filePath) {
                 const keypair = Keypair.fromSecretKey(privateKey);
                 wallets.push(keypair);
             } catch (error) {
-                console.error(`无法处理私钥: ${line}`, error);
+                console.error(`Unable to process private key: ${line}`, error);
             }
         }
 
         return wallets;
     } catch (error) {
-        console.error("读取文件失败:", error);
+        console.error("Failed to read file:", error);
         return [];
     }
 }
@@ -58,24 +58,24 @@ function getRandomInRange(min, max) {
 async function uploadImage() {
     try {
         const files = await fileSystem.promises.readdir("../config/img");
-        console.log("文件夹中的文件：", files);
+        console.log("Files in the folder:", files);
         const imageFiles = files.filter(file =>
             file.match(/\.(jpg|jpeg|png|gif)$/i)
         );
 
         if (imageFiles.length === 0) {
-            console.log("在 img 文件夹中没有找到���效的图片文件");
+            console.log("No valid image files found in the img folder");
             return;
         }
 
         if (imageFiles.length > 1) {
-            console.log("在 img 文件夹中找到多个图片，请只保留一张图片");
+            console.log("Multiple images found in the img folder, please keep only one image");
             return;
         }
         const imageStream = fileSystem.createReadStream(`../config/img/${imageFiles[0]}`);
 
-        console.log("正在上传图片：", imageFiles[0]);
-        //代币元数据
+        console.log("Uploading image:", imageFiles[0]);
+        // Token metadata
         const createData = {
             file: imageStream,
             name: "mrhuang xiuxiu",
@@ -88,16 +88,16 @@ async function uploadImage() {
 
         return createData;
     } catch (err) {
-        console.error("读取文件夹时发生错误:", err);
+        console.error("Error reading folder:", err);
     }
 }
 
 const init = async () => {
-    // ca私钥
+    // ca private key
     const mintPublicKey = "2EnUVrz5NWYGni5W3PMZxLi9igvZ2SSQhtyvBG8TD5bfLSNaxFhgzEQFBUQDNXJpQ289yexKS8yKsyBAJvyjgSC6";
     const mint = Keypair.fromSecretKey(new Uint8Array(bs58.decode(mintPublicKey)));
 
-    // 默认地址查表地址，不可去掉
+    // Default lookup table address, do not remove
     const defaultLookupPublicKey = "8GG7J73ZUgTiv8SKBjqCjQbiaJXZKuNbjm1uhK3p3Zim";
     const defaultLookup = new PublicKey(defaultLookupPublicKey);
 
@@ -106,64 +106,64 @@ const init = async () => {
     const buyAmountSol = BigInt(0.0001 * LAMPORTS_PER_SOL);
 
     const walletNames = await getPublicKeysFromFile("../config/walletKeys.txt");
-    console.log("老鼠仓钱包数量: ", walletNames.length);
+    console.log("Number of wallets detected: ", walletNames.length);
 
     const walletChunks = chunkArray(walletNames, 5);
-    console.log("已创建私钥批次:", walletChunks.length);
+    console.log("Number of private key batches created:", walletChunks.length);
 
     const { lookupTableAddress, signature } = await createAddressLookupTable(connection, wallet);
-    console.log("地址查表地址", lookupTableAddress.toBase58());
-    console.log("交易签名", signature);
+    console.log("Lookup table address", lookupTableAddress.toBase58());
+    console.log("Transaction signature", signature);
 
-    // 提取钱包公钥添加到地址查表地址中
+    // Extract wallet public keys to add to lookup table address
     const walletPublicKeys = walletNames.map(wallet => {
         if (wallet.publicKey) {
             return new PublicKey(wallet.publicKey);
         } else {
-            throw new Error(`钱包缺少公钥字段: ${JSON.stringify(wallet)}`);
+            throw new Error(`Wallet missing public key field: ${JSON.stringify(wallet)}`);
         }
     });
 
-    // // 添加地址到地址查表
+    // Add addresses to lookup table
     const extend = await extendAddressLookupTable(connection, wallet, lookupTableAddress, walletPublicKeys);
-    console.log("交易签名", extend);
+    console.log("Transaction signature", extend);
 
-    // 获取默认查找表账户
+    // Get default lookup table account
     const defaultLookupTableAccounts = (await connection.getAddressLookupTable(defaultLookup)).value;
     if (!defaultLookupTableAccounts) {
-        console.log("没有找到有效的默认查找表账户，停止操作。");
+        console.log("No valid default lookup table accounts found, stopping operation.");
         return;
     }
 
     const addressesFromDefaultLookupTable = defaultLookupTableAccounts.state.addresses;
     if (addressesFromDefaultLookupTable.length === 0) {
-        console.log("默认查找表中没有有效的地址，停止操作。");
+        console.log("No valid addresses in the default lookup table, stopping operation.");
         return;
     }
 
     const customLookupTableAccounts = (await connection.getAddressLookupTable(lookupTableAddress)).value;
     if (!customLookupTableAccounts) {
-        console.log("没有找到有效的自定义查找表账户，停止操作。");
+        console.log("No valid custom lookup table accounts found, stopping operation.");
         return;
     }
     const addressesFromCustomLookupTable = customLookupTableAccounts.state.addresses;
     if (addressesFromCustomLookupTable.length === 0) {
-        console.log("自定义查找表中没有有效的地址，停止操作。");
+        console.log("No valid addresses in the custom lookup table, stopping operation.");
         return;
     }
 
     const metaImage = await uploadImage();
     if (!metaImage) {
-        console.log("没有找到有效的图片文件");
+        console.log("No valid image file found");
         return;
     }
 
     let allTransactions = [];
     let jitoTx = new Transaction();
 
-    // 获取区块哈希
+    // Get block hash
     const latestBlockhash = await connection.getLatestBlockhash('confirmed');
-    console.log("获取区块哈希:", latestBlockhash.blockhash);
+    console.log("Block hash:", latestBlockhash.blockhash);
 
     const metadata = await sdk.createAndBuy(wallet, mint, metaImage, buyAmountSol, SLIPPAGE_BASIS_POINTS, 'confirmed');
     
@@ -183,12 +183,12 @@ const init = async () => {
     const randomIndex = Math.floor(Math.random() * jitoTipAccounts.length);
     const randomJitoTipAccount = jitoTipAccounts[randomIndex];
 
-    console.log("随机选择的小费钱包地址:", randomJitoTipAccount);
+    console.log("Randomly selected tip wallet address:", randomJitoTipAccount);
 
     const transferInstruction = SystemProgram.transfer({
-        fromPubkey: wallet.publicKey,                   // 钱包地址
-        toPubkey: new PublicKey(randomJitoTipAccount),  // 小费钱包地址
-        lamports: 0.0001 * LAMPORTS_PER_SOL,            // 给小费的金额
+        fromPubkey: wallet.publicKey,                   // Wallet address
+        toPubkey: new PublicKey(randomJitoTipAccount),  // Tip wallet address
+        lamports: 0.0001 * LAMPORTS_PER_SOL,            // Tip amount
     });
 
     jitoTx.add(transferInstruction);
@@ -201,30 +201,30 @@ const init = async () => {
 
     const transactionJito = new VersionedTransaction(messageJito);
 
-    // 签名v0交易
+    // Sign v0 transaction
     transactionJito.sign([wallet, mint]);
     
     for (let chunkIndex = 0; chunkIndex < walletChunks.length; chunkIndex++) {
         const chunk = walletChunks[chunkIndex];
-        console.log("处理第", chunkIndex + 1, "批钱包");
+        console.log("Processing batch", chunkIndex + 1, "of wallets");
         let chunkTx = new Transaction();
         for (let i = 0; i < chunk.length; i++) {
 
             const keypair = chunk[i];
-            // 随机一个 10 到 25 之间的百分比
+            // Random percentage between 10 and 25
             const randomPercent = getRandomInRange(10, 25);
 
-            //（例如：买入金额 ± 随机百分比）
+            // (e.g., buy amount ± random percentage)
             const buyAmountSolWithRandom = buyAmountSol / BigInt(100) * BigInt(randomPercent % 2 ? (100 + randomPercent) : (100 - randomPercent));
 
             console.log(buyAmountSolWithRandom);
             
             const instruction = await sdk.getBuyInstructionsBySolAmount(
-                keypair.publicKey,                        // 购买者的地址
-                mint.publicKey,                           // 目标代币的mint地址
-                buyAmountSolWithRandom,                   // 购买所需的SOL数量
-                SLIPPAGE_BASIS_POINTS,                    // 允许的最大滑点为 5%
-                'confirmed'                               // 确认级别为 confirmed
+                keypair.publicKey,                        // Buyer's address
+                mint.publicKey,                           // Target token's mint address
+                buyAmountSolWithRandom,                   // Amount of SOL needed to buy
+                SLIPPAGE_BASIS_POINTS,                    // Maximum slippage allowed is 5%
+                'confirmed'                               // Confirmation level is confirmed
             );
             
             instruction.instructions.forEach((instruction) => {
@@ -237,7 +237,7 @@ const init = async () => {
 
         const modifyComputeUnits = ComputeBudgetProgram.setComputeUnitLimit({ units: 1_000_000 });
         const addPriorityFee = ComputeBudgetProgram.setComputeUnitPrice({ microLamports: 0.00001 * LAMPORTS_PER_SOL });
-        chunkTx.add(modifyComputeUnits, addPriorityFee);  // 添加优先费用指令
+        chunkTx.add(modifyComputeUnits, addPriorityFee);  // Add priority fee instruction
 
         const message = new TransactionMessage({
             payerKey: chunk[0].publicKey,
@@ -247,13 +247,13 @@ const init = async () => {
 
         const transactionV0 = new VersionedTransaction(message);
         const serializedMsg = transactionV0.serialize();
-        console.log("交易大小:", serializedMsg.length);
+        console.log("Transaction size:", serializedMsg.length);
 
         if (serializedMsg.length > 1232) {
-            console.log("交易过大");
+            console.log("Transaction too large");
         }
 
-        // 签名v0交易
+        // Sign v0 transaction
         transactionV0.sign([...chunk]);
 
         allTransactions.push(transactionV0);
@@ -270,7 +270,7 @@ const init = async () => {
         jitoTransactions.push(serializedTransaction)
     }
 
-    console.log("完成创建的交易批次开始提交到Jito:", allTransactions.length);
+    console.log("Completed creating transaction batches, starting submission to Jito:", allTransactions.length);
 
 
     try {
@@ -291,25 +291,25 @@ const init = async () => {
         const endTime = Date.now();
         const timeTaken = endTime - startTime;
 
-        console.log("提交成功:", jito.data);
+        console.log("Submission successful:", jito.data);
         
         const confirmation = await connection.confirmTransaction({
             signature: base58JitoFeeTx,
             lastValidBlockHeight: latestBlockhash.lastValidBlockHeight,
             blockhash: latestBlockhash.blockhash,
         });
-        console.log("交易确认:", confirmation);
-        console.log(`请求耗时：${timeTaken} 毫秒`);
+        console.log("Transaction confirmation:", confirmation);
+        console.log(`Request took: ${timeTaken} ms`);
     } catch (error) {
         if (error.response) {
-            console.error('错误响应:', error.response.data);
+            console.error('Error response:', error.response.data);
             if (error.response.data.error) {
-                console.error('错误代码:', error.response.data.error.code);
-                console.error('错误信息:', error.response.data.error.message);
-                console.error('错误详情:', error.response.data.error.details);
+                console.error('Error code:', error.response.data.error.code);
+                console.error('Error message:', error.response.data.error.message);
+                console.error('Error details:', error.response.data.error.details);
             }
         } else if (error.request) {
-            console.error('请求已发出，但没有收到响应:', error.request);
+            console.error('Request made but no response received:', error.request);
         }
     }
 };
